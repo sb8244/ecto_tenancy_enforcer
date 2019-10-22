@@ -140,8 +140,15 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
+  defp parse_value(_, _), do: nil
+
   defp parse_field({{:., [], [{:&, [], [_ix]}, field_name]}, [], []}) do
     field_name
+  end
+
+  # This value is not used by anything, so it's descriptive
+  defp parse_field({:fragment, _, _}) do
+    :tenancy_cannot_extract_from_fragment
   end
 end
 

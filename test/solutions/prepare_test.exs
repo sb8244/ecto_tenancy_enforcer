@@ -57,11 +57,24 @@ defmodule Solutions.PrepareTest do
       assert Repo.all(valid) |> length == 1
     end
 
-    test "invalid query with multiple tenant id in list" do
-      valid = from c in Company, where: c.tenant_id in [1, 2]
+    test "valid query with tenant id in dynamic" do
+      dynamic_where = dynamic([c], c.tenant_id == 1)
+      valid = from c in Company, where: ^dynamic_where
+      assert Repo.all(valid) |> length == 1
+    end
 
+    test "invalid query with multiple tenant id in list" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(valid) |> length == 1
+        Repo.all(from c in Company, where: c.tenant_id in [1, 2])
+      end)
+    end
+
+    test "invalid query with tenant id in fragment" do
+      assert_raise(TenancyViolation, fn ->
+        Repo.all(
+          from c in Company,
+            where: fragment("(?)", c.tenant_id) == 1
+        )
       end)
     end
 
@@ -309,32 +322,28 @@ defmodule Solutions.PrepareTest do
 
   describe "preload" do
     test "Ecto.Query preload with tenant_id works", %{person: person} do
-      p_q = (
+      p_q =
         from p in Person,
-        where: p.tenant_id == 1
-      )
+          where: p.tenant_id == 1
 
-      valid = (
+      valid =
         from c in Company,
-        where: c.tenant_id == 1,
-        preload: [people: ^p_q]
-      )
+          where: c.tenant_id == 1,
+          preload: [people: ^p_q]
 
       assert [company] = Repo.all(valid)
       assert company.people == [person]
     end
 
     test "Ecto.Repo preload with tenant_id works", %{person: person} do
-      p_q = (
+      p_q =
         from p in Person,
-        where: p.tenant_id == 1
-      )
+          where: p.tenant_id == 1
 
-      valid = (
+      valid =
         from c in Company,
-        where: c.tenant_id == 1,
-        preload: [people: ^p_q]
-      )
+          where: c.tenant_id == 1,
+          preload: [people: ^p_q]
 
       assert [company] = Repo.all(valid)
       assert [company] = Repo.preload([company], people: p_q)
@@ -343,16 +352,14 @@ defmodule Solutions.PrepareTest do
 
     @tag undesired: "This should be an error, but the queries are called separately"
     test "Ecto.Query preload with different tenant_id works" do
-      p_q = (
+      p_q =
         from p in Person,
-        where: p.tenant_id == 2
-      )
+          where: p.tenant_id == 2
 
-      valid = (
+      valid =
         from c in Company,
-        where: c.tenant_id == 1,
-        preload: [people: ^p_q]
-      )
+          where: c.tenant_id == 1,
+          preload: [people: ^p_q]
 
       assert [company] = Repo.all(valid)
       assert company.people == []
@@ -361,7 +368,7 @@ defmodule Solutions.PrepareTest do
     @tag undesired: "I'd like this query to be able to automatically extract tenancy"
     test "preload from Ecto.Query without tenant_id is an error" do
       assert_raise(TenancyViolation, fn ->
-        (from c in Company, where: c.tenant_id == 1, preload: [:people])
+        from(c in Company, where: c.tenant_id == 1, preload: [:people])
         |> Repo.all()
       end)
     end
@@ -369,7 +376,7 @@ defmodule Solutions.PrepareTest do
     @tag undesired: "I'd like this query to be able to automatically extract tenancy"
     test "preload from Ecto.Repo without tenant_id is an error" do
       assert_raise(TenancyViolation, fn ->
-        (from c in Company, where: c.tenant_id == 1)
+        from(c in Company, where: c.tenant_id == 1)
         |> Repo.all()
         |> Repo.preload([:people], tenant_id: 1)
       end)
