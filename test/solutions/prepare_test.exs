@@ -8,7 +8,9 @@ defmodule Solutions.PrepareTest do
   setup do
     assert {:ok, company} = Repo.insert(%Company{tenant_id: 1, name: "mine"})
     assert {:ok, company2} = Repo.insert(%Company{tenant_id: 2, name: "other tenant"})
-    assert {:ok, person} = Repo.insert(%Person{tenant_id: 1, name: "Steve", company_id: company.id})
+
+    assert {:ok, person} =
+             Repo.insert(%Person{tenant_id: 1, name: "Steve", company_id: company.id})
 
     {:ok, %{company: company, company2: company2}}
   end
@@ -57,6 +59,7 @@ defmodule Solutions.PrepareTest do
 
     test "invalid query with multiple tenant id in list" do
       valid = from c in Company, where: c.tenant_id in [1, 2]
+
       assert_raise(TenancyViolation, fn ->
         Repo.all(valid) |> length == 1
       end)
@@ -66,7 +69,7 @@ defmodule Solutions.PrepareTest do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
           from c in Company,
-          where: c.tenant_id > 1
+            where: c.tenant_id > 1
         )
       end)
     end
@@ -75,10 +78,11 @@ defmodule Solutions.PrepareTest do
       assert_raise(TenancyViolation, fn ->
         a = 1
         b = 2
+
         Repo.all(
           from c in Company,
-          where: c.tenant_id == ^a,
-          where: c.tenant_id == ^b
+            where: c.tenant_id == ^a,
+            where: c.tenant_id == ^b
         )
       end)
     end
@@ -87,7 +91,7 @@ defmodule Solutions.PrepareTest do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
           from c in Company,
-          where: c.tenant_id == 1 or c.id == 2
+            where: c.tenant_id == 1 or c.id == 2
         )
       end)
     end
@@ -95,7 +99,7 @@ defmodule Solutions.PrepareTest do
     test "valid, 'or' condition AND'd with tenant_id" do
       Repo.all(
         from c in Company,
-        where: c.tenant_id == 1 and (c.id == 2 or c.id == 3)
+          where: c.tenant_id == 1 and (c.id == 2 or c.id == 3)
       )
     end
   end
@@ -104,17 +108,15 @@ defmodule Solutions.PrepareTest do
     test "invalid, all join associations must be equal on tenant_id" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
-          from p in Person,
-          join: c in Company, on: c.id == p.company_id,
-          where: p.tenant_id == 1
+          from p in Person, join: c in Company, on: c.id == p.company_id, where: p.tenant_id == 1
         )
       end)
 
       assert_raise(TenancyViolation, fn ->
         Repo.all(
           from p in Person,
-          join: c in assoc(p, :company),
-          where: p.tenant_id == 1
+            join: c in assoc(p, :company),
+            where: p.tenant_id == 1
         )
       end)
     end
@@ -122,17 +124,18 @@ defmodule Solutions.PrepareTest do
     test "valid, no tenancy is required if the model isn't enforced" do
       valid =
         from p in Person,
-        join: ur in UnenforcedResource, on: ur.id == p.company_id,
-        where: p.tenant_id == 1
+          join: ur in UnenforcedResource,
+          on: ur.id == p.company_id,
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) == []
 
       # Is this what I want? People is enforced but unenforced_resource is not...
       valid =
         from p in Person,
-        join: ur in assoc(p, :unenforced_resource),
-        join: p2 in assoc(ur, :people),
-        where: p.tenant_id == 1
+          join: ur in assoc(p, :unenforced_resource),
+          join: p2 in assoc(ur, :people),
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) == []
     end
@@ -140,38 +143,35 @@ defmodule Solutions.PrepareTest do
     test "valid, single join association has tenant_id included" do
       valid =
         from p in Person,
-        join: c in Company, on: c.tenant_id == p.tenant_id,
-        where: p.tenant_id == 1
+          join: c in Company,
+          on: c.tenant_id == p.tenant_id,
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
 
       valid =
         from p in Person,
-        join: c in Company, on: c.tenant_id == p.tenant_id and c.id == p.company_id,
-        where: p.tenant_id == 1
+          join: c in Company,
+          on: c.tenant_id == p.tenant_id and c.id == p.company_id,
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
 
       valid =
         from p in Person,
-        join: c in assoc(p, :company), on: c.tenant_id == p.tenant_id,
-        where: p.tenant_id == 1
+          join: c in assoc(p, :company),
+          on: c.tenant_id == p.tenant_id,
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
     end
 
     test "valid, single join association with a static tenant_id" do
-      valid =
-        from p in Person,
-        join: c in Company, on: c.tenant_id == 1,
-        where: p.tenant_id == 1
+      valid = from p in Person, join: c in Company, on: c.tenant_id == 1, where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
 
-      valid =
-        from p in Person,
-        join: c in Company, on: c.tenant_id == ^1,
-        where: p.tenant_id == 1
+      valid = from p in Person, join: c in Company, on: c.tenant_id == ^1, where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
     end
@@ -179,35 +179,34 @@ defmodule Solutions.PrepareTest do
     test "invalid, single join association with static tenant_id that isn't the same between joins or wheres" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
-          from p in Person,
-          join: c in Company, on: c.tenant_id == ^1,
-          where: p.tenant_id == 2
+          from p in Person, join: c in Company, on: c.tenant_id == ^1, where: p.tenant_id == 2
         )
       end)
 
       assert_raise(TenancyViolation, fn ->
         Repo.all(
           from p in Person,
-          join: c in Company, on: c.tenant_id == ^1 and c.tenant_id == 2,
-          where: p.tenant_id == 1
+            join: c in Company,
+            on: c.tenant_id == ^1 and c.tenant_id == 2,
+            where: p.tenant_id == 1
         )
       end)
     end
 
     test "valid, single join with single tenant id in list" do
       assert Repo.all(
-        from p in Person,
-        join: c in Company, on: c.tenant_id in [1],
-        where: p.tenant_id == 1
-      ) |> length() == 1
+               from p in Person,
+                 join: c in Company,
+                 on: c.tenant_id in [1],
+                 where: p.tenant_id == 1
+             )
+             |> length() == 1
     end
 
     test "invalid, single join with different tenant id in list" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
-          from p in Person,
-          join: c in Company, on: c.tenant_id in [2],
-          where: p.tenant_id == 1
+          from p in Person, join: c in Company, on: c.tenant_id in [2], where: p.tenant_id == 1
         )
       end)
     end
@@ -215,9 +214,7 @@ defmodule Solutions.PrepareTest do
     test "invalid, single join with tenant id in list" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
-          from p in Person,
-          join: c in Company, on: c.tenant_id in [1, 2],
-          where: p.tenant_id == 1
+          from p in Person, join: c in Company, on: c.tenant_id in [1, 2], where: p.tenant_id == 1
         )
       end)
     end
@@ -225,9 +222,11 @@ defmodule Solutions.PrepareTest do
     test "valid, multiple joins all include tenant_id" do
       valid =
         from p in Person,
-        join: c in Company, on: c.tenant_id == p.tenant_id,
-        join: c2 in Company, on: c2.tenant_id == p.tenant_id,
-        where: p.tenant_id == 1
+          join: c in Company,
+          on: c.tenant_id == p.tenant_id,
+          join: c2 in Company,
+          on: c2.tenant_id == p.tenant_id,
+          where: p.tenant_id == 1
 
       assert Repo.all(valid) |> length == 1
     end
@@ -236,19 +235,18 @@ defmodule Solutions.PrepareTest do
       assert_raise(TenancyViolation, fn ->
         Repo.all(
           from p in Person,
-          join: c in Company, on: c.tenant_id == p.tenant_id,
-          join: c2 in Company, on: c2.id == p.company_id,
-          where: p.tenant_id == 1
+            join: c in Company,
+            on: c.tenant_id == p.tenant_id,
+            join: c2 in Company,
+            on: c2.id == p.company_id,
+            where: p.tenant_id == 1
         )
       end)
     end
 
     test "invalid, the query must be rooted to tenant_id" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(
-          from p in Person,
-          join: c in Company, on: c.tenant_id == p.tenant_id
-        )
+        Repo.all(from p in Person, join: c in Company, on: c.tenant_id == p.tenant_id)
       end)
     end
   end
@@ -294,17 +292,17 @@ defmodule Solutions.PrepareTest do
   describe "Repo.one" do
     test "raises for non-qualified queries", %{company: company} do
       assert_raise(TenancyViolation, fn ->
-        Repo.one(from c in Company)
+        Repo.one(from(c in Company))
       end)
 
       assert_raise(TenancyViolation, fn ->
-        invalid = from c in Company, where: c.id == ^(company.id)
+        invalid = from c in Company, where: c.id == ^company.id
         Repo.one(invalid)
       end)
     end
 
     test "works for qualified queries", %{company: company} do
-      valid = from c in Company, where: c.tenant_id == 1, where: c.id == ^(company.id)
+      valid = from c in Company, where: c.tenant_id == 1, where: c.id == ^company.id
       assert Repo.one(valid) == company
     end
   end

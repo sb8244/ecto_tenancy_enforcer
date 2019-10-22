@@ -3,26 +3,40 @@ defmodule EctoTenancyEnforcer do
     defexception message: nil
   end
 
-  def enforce!(query = %{from: %{source: {_table, mod}}}, enforced_schemas) do
-    if mod in enforced_schemas do
-      source_modules = SourceCollector.collect_modules(query)
+  def enforce!(query, enforced_schemas) do
+    case enforce(query, enforced_schemas) do
+      ret = {:ok, _} ->
+        ret
 
-      {:ok, tenant_ids_in_wheres} = enforce_where!(query)
-      {:ok, tenant_ids_in_joins} = enforce_joins!(query, enforced_schemas, source_modules)
-
-      case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
-        [_] -> true
-        _ -> raise TenancyViolation, "This query would run across multiple tenants: #{inspect query}"
-      end
-
-      true
-    else
-      :unenforced_schema
+      {:error, message} ->
+        raise TenancyViolation, message
     end
   end
 
-  defp enforce_joins!(query = %{joins: joins}, enforced_schemas, source_modules) do
-    Enum.filter(joins, & join_requires_tenancy?(&1, enforced_schemas, source_modules))
+  def enforce(query = %{from: %{source: {_table, mod}}}, enforced_schemas) do
+    if mod in enforced_schemas do
+      verify_query(query, enforced_schemas)
+    else
+      {:ok, :unenforced_schema}
+    end
+  end
+
+  defp verify_query(query, enforced_schemas) do
+    with source_modules <- SourceCollector.collect_modules(query),
+         {:ok, tenant_ids_in_wheres} <- enforce_where(query),
+         {:ok, tenant_ids_in_joins} <- enforce_joins(query, enforced_schemas, source_modules) do
+      case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
+        [_] -> {:ok, :valid}
+        _ -> {:error, "This query would run across multiple tenants: #{inspect(query)}"}
+      end
+    else
+      e = {:error, _} ->
+        e
+    end
+  end
+
+  defp enforce_joins(query = %{joins: joins}, enforced_schemas, source_modules) do
+    Enum.filter(joins, &join_requires_tenancy?(&1, enforced_schemas, source_modules))
     |> case do
       [] ->
         {:ok, []}
@@ -38,25 +52,28 @@ defmodule EctoTenancyEnforcer do
           end)
 
         if length(each_join_result) == length(joins) and Enum.all?(each_join_result, & &1) do
-          {:ok, Enum.filter(each_join_result, & &1 != :tenancy_equal)}
+          {:ok, Enum.filter(each_join_result, &(&1 != :tenancy_equal))}
         else
-          raise TenancyViolation, "This query has joins that don't include tenant_id: #{inspect query}"
+          {:error, "This query has joins that don't include tenant_id: #{inspect(query)}"}
         end
     end
   end
 
-  defp join_requires_tenancy?(%{source: {_table, mod}}, enforced_schemas, _source_mods), do: mod in enforced_schemas
+  defp join_requires_tenancy?(%{source: {_table, mod}}, enforced_schemas, _source_mods),
+    do: mod in enforced_schemas
+
   defp join_requires_tenancy?(%{assoc: {ix, name}}, enforced_schemas, source_mods) do
     case Enum.at(source_mods, ix) do
       source_mod when not is_nil(source_mod) ->
         assoc_mod = source_mod.__schema__(:association, name).related
 
-        Enum.all?([source_mod, assoc_mod], & Enum.member?(enforced_schemas, &1))
+        Enum.all?([source_mod, assoc_mod], &Enum.member?(enforced_schemas, &1))
     end
   end
+
   defp join_requires_tenancy?(_, _, _), do: true
 
-  defp enforce_where!(%{wheres: wheres}) do
+  defp enforce_where(%{wheres: wheres}) do
     matches = matched_values_from_where(wheres, [])
     {:ok, Enum.uniq(matches)}
   end
@@ -69,10 +86,15 @@ defmodule EctoTenancyEnforcer do
   defp matched_values_from_where([], matched_values), do: matched_values
 
   # This happens in joins
-  defp parse_expr({:==, [], [
-    {{:., [], [{:&, [], [_]}, left_column]}, [], []},
-    {{:., [], [{:&, [], [_]}, right_column]}, [], []}
-  ]}, _params, matched_values) do
+  defp parse_expr(
+         {:==, [],
+          [
+            {{:., [], [{:&, [], [_]}, left_column]}, [], []},
+            {{:., [], [{:&, [], [_]}, right_column]}, [], []}
+          ]},
+         _params,
+         matched_values
+       ) do
     if left_column == :tenant_id && right_column == :tenant_id do
       [:tenancy_equal | matched_values]
     else

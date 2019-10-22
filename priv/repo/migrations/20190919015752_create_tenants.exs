@@ -7,6 +7,5 @@ defmodule Tenancy.Repo.Migrations.CreateTenants do
 
       timestamps()
     end
-
   end
 end
