@@ -21,6 +21,10 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
+  def enforce(%Ecto.Query{from: %{source: %{query: subquery}}}, enforced_schemas) do
+    enforce(subquery, enforced_schemas)
+  end
+
   defp verify_query(query, enforced_schemas) do
     with source_modules <- SourceCollector.collect_modules(query),
          {:ok, tenant_ids_in_wheres} <- enforce_where(query),

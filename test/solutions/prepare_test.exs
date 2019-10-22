@@ -320,6 +320,26 @@ defmodule Solutions.PrepareTest do
     end
   end
 
+  describe "Repo.aggregate" do
+    test "aggregates correctly with tenant_id set" do
+      valid = from c in Company, where: c.tenant_id == 1
+      assert Repo.aggregate(valid, :count, :id) == 1
+    end
+
+    test "aggregates correctly with distinct/limit/offset" do
+      # sourced from repo_test "uses subqueries with distinct/limit/offset"
+      valid = from c in Company, where: c.tenant_id == 1, limit: 1
+      assert Repo.aggregate(valid, :count, :id) == 1
+    end
+
+    test "raises an error without tenant_id set" do
+      assert_raise(TenancyViolation, fn ->
+        invalid = from c in Company
+        Repo.aggregate(invalid, :count, :id)
+      end)
+    end
+  end
+
   describe "preload" do
     test "Ecto.Query preload with tenant_id works", %{person: person} do
       p_q =
