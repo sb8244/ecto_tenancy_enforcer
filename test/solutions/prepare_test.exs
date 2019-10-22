@@ -12,7 +12,7 @@ defmodule Solutions.PrepareTest do
     assert {:ok, person} =
              Repo.insert(%Person{tenant_id: 1, name: "Steve", company_id: company.id})
 
-    {:ok, %{company: company, company2: company2}}
+    {:ok, %{company: company, company2: company2, person: person}}
   end
 
   describe "Repo.all, single table" do
@@ -308,6 +308,56 @@ defmodule Solutions.PrepareTest do
   end
 
   describe "preload" do
+    test "Ecto.Query preload with tenant_id works", %{person: person} do
+      p_q = (
+        from p in Person,
+        where: p.tenant_id == 1
+      )
+
+      valid = (
+        from c in Company,
+        where: c.tenant_id == 1,
+        preload: [people: ^p_q]
+      )
+
+      assert [company] = Repo.all(valid)
+      assert company.people == [person]
+    end
+
+    test "Ecto.Repo preload with tenant_id works", %{person: person} do
+      p_q = (
+        from p in Person,
+        where: p.tenant_id == 1
+      )
+
+      valid = (
+        from c in Company,
+        where: c.tenant_id == 1,
+        preload: [people: ^p_q]
+      )
+
+      assert [company] = Repo.all(valid)
+      assert [company] = Repo.preload([company], people: p_q)
+      assert company.people == [person]
+    end
+
+    @tag undesired: "This should be an error, but the queries are called separately"
+    test "Ecto.Query preload with different tenant_id works" do
+      p_q = (
+        from p in Person,
+        where: p.tenant_id == 2
+      )
+
+      valid = (
+        from c in Company,
+        where: c.tenant_id == 1,
+        preload: [people: ^p_q]
+      )
+
+      assert [company] = Repo.all(valid)
+      assert company.people == []
+    end
+
     @tag undesired: "I'd like this query to be able to automatically extract tenancy"
     test "preload from Ecto.Query without tenant_id is an error" do
       assert_raise(TenancyViolation, fn ->
