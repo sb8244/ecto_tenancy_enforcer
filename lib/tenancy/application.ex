@@ -8,7 +8,6 @@ defmodule Tenancy.Application do
   def start(_type, _args) do
     children = [
       Tenancy.Repo,
-      Tenancy.PrepareQueryRepo,
       TenancyWeb.Endpoint
     ]
 

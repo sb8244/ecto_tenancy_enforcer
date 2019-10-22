@@ -2,7 +2,7 @@ defmodule Solutions.PrepareTest do
   use Tenancy.DataCase, async: true
 
   alias Tenancy.{Company, UnenforcedResource, Person}
-  alias Tenancy.PrepareQueryRepo, as: Repo
+  alias Tenancy.Repo, as: Repo
   alias EctoTenancyEnforcer.TenancyViolation
 
   setup do
@@ -309,8 +309,8 @@ defmodule Solutions.PrepareTest do
     end
   end
 
-  # describe "preload" do
-  #   # This would be nice
-  #   test "the tenant id is extracted from the parent query for preloads"
-  # end
+  describe "preload" do
+    # This would be nice
+    test "the tenant id is extracted from the parent query for preloads"
+  end
 end

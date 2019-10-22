@@ -8,7 +8,7 @@
 use Mix.Config
 
 config :tenancy,
-  ecto_repos: [Tenancy.Repo, Tenancy.PrepareQueryRepo]
+  ecto_repos: [Tenancy.Repo]
 
 # Configures the endpoint
 config :tenancy, TenancyWeb.Endpoint,

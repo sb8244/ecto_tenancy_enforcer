@@ -27,11 +27,9 @@ defmodule Tenancy.DataCase do
 
   setup tags do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tenancy.Repo)
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tenancy.PrepareQueryRepo)
 
     unless tags[:async] do
       Ecto.Adapters.SQL.Sandbox.mode(Tenancy.Repo, {:shared, self()})
-      Ecto.Adapters.SQL.Sandbox.mode(Tenancy.PrepareQueryRepo, {:shared, self()})
     end
 
     :ok
