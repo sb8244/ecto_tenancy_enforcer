@@ -308,7 +308,21 @@ defmodule Solutions.PrepareTest do
   end
 
   describe "preload" do
-    # This would be nice
-    test "the tenant id is extracted from the parent query for preloads"
+    @tag undesired: "I'd like this query to be able to automatically extract tenancy"
+    test "preload from Ecto.Query without tenant_id is an error" do
+      assert_raise(TenancyViolation, fn ->
+        (from c in Company, where: c.tenant_id == 1, preload: [:people])
+        |> Repo.all()
+      end)
+    end
+
+    @tag undesired: "I'd like this query to be able to automatically extract tenancy"
+    test "preload from Ecto.Repo without tenant_id is an error" do
+      assert_raise(TenancyViolation, fn ->
+        (from c in Company, where: c.tenant_id == 1)
+        |> Repo.all()
+        |> Repo.preload([:people], tenant_id: 1)
+      end)
+    end
   end
 end

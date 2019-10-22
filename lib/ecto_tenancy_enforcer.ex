@@ -3,7 +3,7 @@ defmodule EctoTenancyEnforcer do
     defexception message: nil
   end
 
-  def enforce!(query, enforced_schemas) do
+  def enforce!(query = %Ecto.Query{}, enforced_schemas) do
     case enforce(query, enforced_schemas) do
       ret = {:ok, _} ->
         ret
@@ -13,7 +13,7 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  def enforce(query = %{from: %{source: {_table, mod}}}, enforced_schemas) do
+  def enforce(query = %Ecto.Query{from: %{source: {_table, mod}}}, enforced_schemas) do
     if mod in enforced_schemas do
       verify_query(query, enforced_schemas)
     else
