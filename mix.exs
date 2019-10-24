@@ -3,8 +3,8 @@ defmodule Tenancy.MixProject do
 
   def project do
     [
-      app: :tenancy,
-      version: "0.1.0",
+      app: :ecto_tenancy_enforcer,
+      version: "0.0.1",
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
