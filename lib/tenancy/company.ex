@@ -6,6 +6,7 @@ defmodule Tenancy.Company do
     field :name, :string
     field :tenant_id, :id
     has_many :people, Tenancy.Person
+    has_many :alternates, Tenancy.Alternate
 
     timestamps()
   end

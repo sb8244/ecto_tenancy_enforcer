@@ -40,7 +40,7 @@ defmodule EctoTenancyEnforcer do
 
   defp verify_query(query, enforced_schemas) do
     with source_modules <- SourceCollector.collect_modules(query),
-         {:ok, tenant_ids_in_wheres} <- enforce_where(query),
+         {:ok, tenant_ids_in_wheres} <- enforce_where(query, enforced_schemas, source_modules),
          {:ok, tenant_ids_in_joins} <- enforce_joins(query, enforced_schemas, source_modules) do
       case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
         [_] -> {:ok, :valid}
@@ -62,7 +62,13 @@ defmodule EctoTenancyEnforcer do
         each_join_result =
           Enum.reduce(joins, [], fn join = %{on: on_expr}, matched_values ->
             if join_requires_tenancy?(join, enforced_schemas, source_modules) do
-              parse_expr(on_expr.expr, on_expr.params, matched_values)
+              parse_expr(
+                on_expr.expr,
+                on_expr.params,
+                matched_values,
+                enforced_schemas,
+                source_modules
+              )
             else
               matched_values
             end
@@ -76,6 +82,7 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
+  # Incorrect source module being extracted here. It is actually the association mod, the source is
   defp join_requires_tenancy?(%{source: {_table, mod}}, enforced_schemas, _source_mods),
     do: mod in Map.keys(enforced_schemas)
 
@@ -91,62 +98,98 @@ defmodule EctoTenancyEnforcer do
 
   defp join_requires_tenancy?(_, _, _), do: true
 
-  defp enforce_where(%{wheres: wheres}) do
-    matches = matched_values_from_where(wheres, [])
+  defp enforce_where(%{wheres: wheres}, enforced_schemas, source_mods) do
+    matches = matched_values_from_where(wheres, [], enforced_schemas, source_mods)
     {:ok, Enum.uniq(matches)}
   end
 
-  defp matched_values_from_where([%{expr: expr, params: params} | exprs], matched_values) do
-    matched_values = parse_expr(expr, params, matched_values)
-    matched_values_from_where(exprs, matched_values)
+  defp matched_values_from_where(
+         [%{expr: expr, params: params} | exprs],
+         matched_values,
+         enforced_schemas,
+         source_mods
+       ) do
+    matched_values = parse_expr(expr, params, matched_values, enforced_schemas, source_mods)
+    matched_values_from_where(exprs, matched_values, enforced_schemas, source_mods)
   end
 
-  defp matched_values_from_where([], matched_values), do: matched_values
+  defp matched_values_from_where([], matched_values, _enforced_schemas, _source_mods),
+    do: matched_values
 
   # This happens in joins
   defp parse_expr(
          {:==, [],
           [
-            {{:., _, [{:&, _, [_]}, left_column]}, _, []},
-            {{:., _, [{:&, _, [_]}, right_column]}, _, []}
+            {{:., _, [{:&, _, [left_schema_ix]}, l_column]}, _, []},
+            {{:., _, [{:&, _, [right_schema_ix]}, r_column]}, _, []}
           ]},
          _params,
-         matched_values
+         matched_values,
+         enforced_schemas,
+         source_modules
        ) do
-    if left_column == :tenant_id && right_column == :tenant_id do
-      [:tenancy_equal | matched_values]
-    else
-      matched_values
+    # A join is between two tables. We need to check that each table is joining on its appropriate
+    # tenant_id_column, as they may be different
+    case {Enum.at(source_modules, left_schema_ix), Enum.at(source_modules, right_schema_ix)} do
+      {l_mod, r_mod} when not is_nil(l_mod) and not is_nil(r_mod) ->
+        l_tenant_column_name = Map.fetch!(enforced_schemas, l_mod) |> Map.fetch!(:tenant_id_column)
+        r_tenant_column_name = Map.fetch!(enforced_schemas, r_mod) |> Map.fetch!(:tenant_id_column)
+
+        if l_column == l_tenant_column_name && r_column == r_tenant_column_name do
+          [:tenancy_equal | matched_values]
+        else
+          matched_values
+        end
     end
   end
 
-  defp parse_expr({:==, _, [field, value]}, params, matched_values) do
-    query_field = parse_field(field)
-    query_value = parse_value(value, params)
-
-    if query_field == :tenant_id and is_integer(query_value) do
+  defp parse_expr(
+         {:==, _, [field, value]},
+         params,
+         matched_values,
+         enforced_schemas,
+         source_modules
+       ) do
+    with {query_mod, query_field} <- parse_field(field, source_modules),
+         query_value <- parse_value(value, params),
+         tenant_id_column <- Map.fetch!(enforced_schemas, query_mod) |> Map.fetch!(:tenant_id_column),
+         true <- query_field == tenant_id_column and is_integer(query_value) do
       [query_value | matched_values]
     else
-      matched_values
+      _ ->
+        matched_values
     end
   end
 
-  defp parse_expr({:and, _, [expr1, expr2]}, params, matched_values) do
-    left = parse_expr(expr1, params, matched_values)
-    parse_expr(expr2, params, left)
+  defp parse_expr(
+         {:and, _, [expr1, expr2]},
+         params,
+         matched_values,
+         enforced_schemas,
+         source_modules
+       ) do
+    left = parse_expr(expr1, params, matched_values, enforced_schemas, source_modules)
+    parse_expr(expr2, params, left, enforced_schemas, source_modules)
   end
 
-  defp parse_expr({:in, _, [field, value]}, params, matched_values) do
-    query_field = parse_field(field)
+  defp parse_expr(
+         {:in, _, [field, value]},
+         params,
+         matched_values,
+         enforced_schemas,
+         source_modules
+       ) do
+    {query_mod, query_field} = parse_field(field, source_modules)
     query_value = parse_value(value, params)
+    tenant_id_column = Map.fetch!(enforced_schemas, query_mod) |> Map.fetch!(:tenant_id_column)
 
     case {query_field, query_value} do
-      {:tenant_id, [item]} when is_integer(item) -> [item | matched_values]
+      {^tenant_id_column, [item]} when is_integer(item) -> [item | matched_values]
       _ -> matched_values
     end
   end
 
-  defp parse_expr(_, _, matched_values) do
+  defp parse_expr(_, _, matched_values, _enforced_schemas, _source_modules) do
     matched_values
   end
 
@@ -160,12 +203,12 @@ defmodule EctoTenancyEnforcer do
 
   defp parse_value(_, _), do: nil
 
-  defp parse_field({{:., _, [{:&, _, [_ix]}, field_name]}, _, []}) do
-    field_name
+  defp parse_field({{:., _, [{:&, _, [ix]}, field_name]}, _, []}, source_modules) do
+    {Enum.at(source_modules, ix), field_name}
   end
 
   # This value is not used by anything, so it's descriptive
-  defp parse_field({:fragment, _, _}) do
+  defp parse_field({:fragment, _, _}, _source_modules) do
     :tenancy_cannot_extract_from_fragment
   end
 end

@@ -116,8 +116,7 @@ defmodule Ecto.RepoTest do
     assert %MySchema{map: %{color: "red"}} = TestRepo.load(MySchema, %{map: %{color: "red"}})
 
     # map field with strings
-    assert %MySchema{map: %{"color" => "red"}} =
-             TestRepo.load(MySchema, %{map: %{"color" => "red"}})
+    assert %MySchema{map: %{"color" => "red"}} = TestRepo.load(MySchema, %{map: %{"color" => "red"}})
 
     # nil
     assert %MySchema{x: nil} = TestRepo.load(MySchema, %{x: nil})
@@ -1050,8 +1049,7 @@ defmodule Ecto.RepoTest do
         conflict_target: [:id]
       )
 
-      assert_received {:insert_all, %{source: "my_schema", on_conflict: {^fields, [], [:id]}},
-                       ^rows}
+      assert_received {:insert_all, %{source: "my_schema", on_conflict: {^fields, [], [:id]}}, ^rows}
     end
 
     test "raises on non-existent fields on replace" do

@@ -1,7 +1,7 @@
 defmodule Solutions.PrepareTest do
   use Tenancy.DataCase, async: true
 
-  alias Tenancy.{Company, UnenforcedResource, Person}
+  alias Tenancy.{Alternate, Company, UnenforcedResource, Person}
   alias Tenancy.Repo, as: Repo
   alias EctoTenancyEnforcer.TenancyViolation
 
@@ -9,10 +9,11 @@ defmodule Solutions.PrepareTest do
     assert {:ok, company} = Repo.insert(%Company{tenant_id: 1, name: "mine"})
     assert {:ok, company2} = Repo.insert(%Company{tenant_id: 2, name: "other tenant"})
 
-    assert {:ok, person} =
-             Repo.insert(%Person{tenant_id: 1, name: "Steve", company_id: company.id})
+    assert {:ok, person} = Repo.insert(%Person{tenant_id: 1, name: "Steve", company_id: company.id})
 
-    {:ok, %{company: company, company2: company2, person: person}}
+    assert {:ok, alternate} = Repo.insert(%Alternate{team_id: 1, name: "Steve", company_id: company.id})
+
+    {:ok, %{company: company, company2: company2, person: person, alternate: alternate}}
   end
 
   describe "Repo.all, single table" do
@@ -120,9 +121,7 @@ defmodule Solutions.PrepareTest do
   describe "Repo.all, joined tables" do
     test "invalid, all join associations must be equal on tenant_id" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(
-          from p in Person, join: c in Company, on: c.id == p.company_id, where: p.tenant_id == 1
-        )
+        Repo.all(from p in Person, join: c in Company, on: c.id == p.company_id, where: p.tenant_id == 1)
       end)
 
       assert_raise(TenancyViolation, fn ->
@@ -179,6 +178,65 @@ defmodule Solutions.PrepareTest do
       assert Repo.all(valid) |> length == 1
     end
 
+    test "valid, single join association but source side has an alternate tenant id column name" do
+      # Plain
+      # valid =
+      #   from a in Alternate,
+      #     join: c in Company,
+      #     on: c.tenant_id == a.team_id,
+      #     where: a.team_id == 1
+
+      # assert Repo.all(valid) |> length == 1
+
+      # # Array based
+      # valid =
+      #   from a in Alternate,
+      #     join: c in Company,
+      #     on: c.tenant_id == a.team_id,
+      #     where: a.team_id in [1]
+
+      # assert Repo.all(valid) |> length == 1
+
+      # assoc
+      valid =
+        from a in Alternate,
+          join: c in assoc(a, :company),
+          on: a.team_id == c.tenant_id,
+          where: a.team_id == 1
+
+      assert Repo.all(valid) |> length == 1
+    end
+
+    test "valid, single join association but target side has an alternate tenant id column name" do
+      # Plain
+      valid =
+        from c in Company,
+          join: a in Alternate,
+          on: c.tenant_id == a.team_id,
+          where: c.tenant_id == 1
+
+      assert Repo.all(valid) |> length == 1
+
+      # Array based
+      valid =
+        from c in Company,
+          join: a in Alternate,
+          on: a.team_id == c.tenant_id,
+          where: c.tenant_id in [1]
+
+      assert Repo.all(valid) |> length == 1
+
+      # assoc
+      valid =
+        from c in Company,
+          join: a in assoc(c, :alternates),
+          on: c.tenant_id == a.team_id,
+          where: c.tenant_id == 1
+
+      assert Repo.all(valid) |> length == 1
+    end
+
+    # TODO: This source can be extracted to make for dynamic tenant_id
     test "valid, single join association with a static tenant_id" do
       valid = from p in Person, join: c in Company, on: c.tenant_id == 1, where: p.tenant_id == 1
 
@@ -191,9 +249,7 @@ defmodule Solutions.PrepareTest do
 
     test "invalid, single join association with static tenant_id that isn't the same between joins or wheres" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(
-          from p in Person, join: c in Company, on: c.tenant_id == ^1, where: p.tenant_id == 2
-        )
+        Repo.all(from p in Person, join: c in Company, on: c.tenant_id == ^1, where: p.tenant_id == 2)
       end)
 
       assert_raise(TenancyViolation, fn ->
@@ -218,17 +274,13 @@ defmodule Solutions.PrepareTest do
 
     test "invalid, single join with different tenant id in list" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(
-          from p in Person, join: c in Company, on: c.tenant_id in [2], where: p.tenant_id == 1
-        )
+        Repo.all(from p in Person, join: c in Company, on: c.tenant_id in [2], where: p.tenant_id == 1)
       end)
     end
 
     test "invalid, single join with tenant id in list" do
       assert_raise(TenancyViolation, fn ->
-        Repo.all(
-          from p in Person, join: c in Company, on: c.tenant_id in [1, 2], where: p.tenant_id == 1
-        )
+        Repo.all(from p in Person, join: c in Company, on: c.tenant_id in [1, 2], where: p.tenant_id == 1)
       end)
     end
 
