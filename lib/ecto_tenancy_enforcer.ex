@@ -107,8 +107,8 @@ defmodule EctoTenancyEnforcer do
   defp parse_expr(
          {:==, [],
           [
-            {{:., [], [{:&, [], [_]}, left_column]}, [], []},
-            {{:., [], [{:&, [], [_]}, right_column]}, [], []}
+            {{:., _, [{:&, _, [_]}, left_column]}, _, []},
+            {{:., _, [{:&, _, [_]}, right_column]}, _, []}
           ]},
          _params,
          matched_values
@@ -131,12 +131,12 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  defp parse_expr({:and, [], [expr1, expr2]}, params, matched_values) do
+  defp parse_expr({:and, _, [expr1, expr2]}, params, matched_values) do
     left = parse_expr(expr1, params, matched_values)
     parse_expr(expr2, params, left)
   end
 
-  defp parse_expr({:in, [], [field, value]}, params, matched_values) do
+  defp parse_expr({:in, _, [field, value]}, params, matched_values) do
     query_field = parse_field(field)
     query_value = parse_value(value, params)
 
@@ -152,7 +152,7 @@ defmodule EctoTenancyEnforcer do
 
   defp parse_value(%Ecto.Query.Tagged{value: value}, _), do: value
 
-  defp parse_value({:^, [], [ix]}, params) do
+  defp parse_value({:^, _, [ix]}, params) do
     case Enum.at(params || [], ix) do
       {value, _type} -> value
     end
@@ -160,7 +160,7 @@ defmodule EctoTenancyEnforcer do
 
   defp parse_value(_, _), do: nil
 
-  defp parse_field({{:., [], [{:&, [], [_ix]}, field_name]}, [], []}) do
+  defp parse_field({{:., _, [{:&, _, [_ix]}, field_name]}, _, []}) do
     field_name
   end
 
