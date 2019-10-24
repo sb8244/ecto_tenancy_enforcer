@@ -20,7 +20,7 @@ defmodule EctoTenancyEnforcer do
     end
 
     def source_by_index(%{source_modules: sources}, ix) do
-      Enum.at(sources, ix) || throw :err_index_missing_in_sources
+      Enum.at(sources, ix) || throw(:err_index_missing_in_sources)
     end
 
     def tenant_id_column_for_schema(%{enforced_schemas: schemas}, mod) do
@@ -92,12 +92,7 @@ defmodule EctoTenancyEnforcer do
         each_join_result =
           Enum.reduce(joins, [], fn join = %{on: on_expr}, matched_values ->
             if join_requires_tenancy?(join, schema_context) do
-              parse_expr(
-                on_expr.expr,
-                on_expr.params,
-                matched_values,
-                schema_context
-              )
+              parse_expr(on_expr.expr, on_expr.params, matched_values, schema_context)
             else
               matched_values
             end
@@ -171,12 +166,7 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  defp parse_expr(
-         {:==, _, [field, value]},
-         params,
-         matched_values,
-         schema_context
-       ) do
+  defp parse_expr({:==, _, [field, value]}, params, matched_values, schema_context) do
     with {query_mod, query_field} <- parse_field(field, schema_context),
          query_value <- parse_value(value, params),
          tenant_id_column <- SchemaContext.tenant_id_column_for_schema(schema_context, query_mod),
@@ -188,22 +178,12 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  defp parse_expr(
-         {:and, _, [expr1, expr2]},
-         params,
-         matched_values,
-         schema_context
-       ) do
+  defp parse_expr({:and, _, [expr1, expr2]}, params, matched_values, schema_context) do
     left = parse_expr(expr1, params, matched_values, schema_context)
     parse_expr(expr2, params, left, schema_context)
   end
 
-  defp parse_expr(
-         {:in, _, [field, value]},
-         params,
-         matched_values,
-         schema_context
-       ) do
+  defp parse_expr({:in, _, [field, value]}, params, matched_values, schema_context) do
     {query_mod, query_field} = parse_field(field, schema_context)
     query_value = parse_value(value, params)
     tenant_id_column = SchemaContext.tenant_id_column_for_schema(schema_context, query_mod)
