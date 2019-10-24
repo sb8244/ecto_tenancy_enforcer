@@ -62,3 +62,11 @@ The following examples demonstrate allowed and not-allowed preloading:
 ## Contributing
 
 // TODO
+
+## TODO
+
+- CI (Travis)
+- Use in a production project
+- CoC
+- License File
+- Contributing File
