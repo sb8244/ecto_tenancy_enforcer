@@ -334,7 +334,7 @@ defmodule Solutions.PrepareTest do
 
     test "raises an error without tenant_id set" do
       assert_raise(TenancyViolation, fn ->
-        invalid = from c in Company
+        invalid = from(c in Company)
         Repo.aggregate(invalid, :count, :id)
       end)
     end
