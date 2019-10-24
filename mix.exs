@@ -24,7 +24,7 @@ defmodule Tenancy.MixProject do
   defp deps do
     [
       {:ecto, "~> 3.2"},
-      {:ecto_sql, "~> 3.0"},
+      {:ecto_sql, "~> 3.2"},
       {:postgrex, ">= 0.0.0", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
