@@ -11,7 +11,6 @@ defmodule Tenancy.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       deps: deps(),
-
       name: "Ecto Tenancy Enforcer",
       description: "Provides a way to ensure that all queries made from your Elixir application, using Ecto, have tenancy set",
       package: package(),
@@ -42,8 +41,7 @@ defmodule Tenancy.MixProject do
       maintainers: ["Stephen Bussey"],
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/sb8244/ecto_tenancy_enforcer"},
-      files:
-        ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib)
+      files: ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib)
     ]
   end
 
