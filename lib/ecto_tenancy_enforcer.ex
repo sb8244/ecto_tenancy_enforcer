@@ -112,7 +112,7 @@ defmodule EctoTenancyEnforcer do
 
   defp join_requires_tenancy?(%{assoc: {ix, name}}, schema_context) do
     case SchemaContext.source_by_index(schema_context, ix) do
-      source_mod when not is_nil(source_mod) ->
+      source_mod ->
         assoc_mod = source_mod.__schema__(:association, name).related
         Enum.all?([source_mod, assoc_mod], &SchemaContext.tenancy_enforced?(schema_context, &1))
     end
