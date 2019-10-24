@@ -1,47 +1,5 @@
 defmodule EctoTenancyEnforcer do
-  defmodule TenancyViolation do
-    defexception message: nil
-  end
-
-  defmodule SchemaContext do
-    def extract!(schemas) do
-      %{
-        enforced_schemas: extract_schemas(schemas),
-        source_modules: :uninitialized
-      }
-    end
-
-    def put(context, :source_modules, source_modules) do
-      Map.put(context, :source_modules, source_modules)
-    end
-
-    def tenancy_enforced?(context, module) do
-      module in enforced_modules(context)
-    end
-
-    def source_by_index(%{source_modules: sources}, ix) do
-      Enum.at(sources, ix) || throw(:err_index_missing_in_sources)
-    end
-
-    def tenant_id_column_for_schema(%{enforced_schemas: schemas}, mod) do
-      Map.fetch!(schemas, mod) |> Map.fetch!(:tenant_id_column)
-    end
-
-    defp enforced_modules(%{enforced_schemas: schemas}) do
-      Map.keys(schemas)
-    end
-
-    # Extract into map of %{schema_module => %{tenant_id_column}}
-    defp extract_schemas(schemas) do
-      Enum.reduce(schemas, %{}, fn
-        {schema, tenant_id_column}, map ->
-          Map.put(map, schema, %{tenant_id_column: tenant_id_column})
-
-        schema, map ->
-          Map.put(map, schema, %{tenant_id_column: :tenant_id})
-      end)
-    end
-  end
+  alias __MODULE__.{SchemaContext, SourceCollector, TenancyViolation}
 
   def enforce!(query = %Ecto.Query{}, opts) do
     case enforce(query, opts) do
@@ -215,65 +173,5 @@ defmodule EctoTenancyEnforcer do
   # This value is not used by anything, so it's descriptive
   defp parse_field({:fragment, _, _}, _schema_context) do
     :tenancy_cannot_extract_from_fragment
-  end
-end
-
-defmodule SourceCollector do
-  @moduledoc """
-  Extracts a list of source modules from a query. This is used positionally by Ecto
-  associations to tell what module an association is for.
-  """
-
-  def collect_modules(query) do
-    query
-    |> collect_sources()
-    |> associate_modules()
-  end
-
-  defp collect_sources(%{from: nil, joins: joins}) do
-    ["query" | join_sources(joins)]
-  end
-
-  defp collect_sources(%{from: %{source: source}, joins: joins}) do
-    [from_sources(source) | join_sources(joins)]
-  end
-
-  defp associate_modules([from | sources]) do
-    Enum.reduce(sources, [from], fn source, acc ->
-      normalized =
-        case source do
-          {var, association_name} ->
-            source_mod = Enum.at(acc, var)
-            source_mod.__schema__(:association, association_name).related
-
-          source_mod ->
-            source_mod
-        end
-
-      # Add to end to preserve `var` ordering
-      acc ++ [normalized]
-    end)
-  end
-
-  defp from_sources(%Ecto.SubQuery{query: query}), do: from_sources(query.from.source)
-  defp from_sources({source, schema}), do: schema || source
-  defp from_sources(nil), do: "query"
-
-  defp join_sources(joins) do
-    joins
-    |> Enum.sort_by(& &1.ix)
-    |> Enum.map(fn
-      %Ecto.Query.JoinExpr{assoc: assoc = {_, _}} ->
-        assoc
-
-      %Ecto.Query.JoinExpr{source: {:fragment, _, _}} ->
-        "fragment"
-
-      %Ecto.Query.JoinExpr{source: %Ecto.Query{from: from}} ->
-        from_sources(from.source)
-
-      %Ecto.Query.JoinExpr{source: source} ->
-        from_sources(source)
-    end)
   end
 end
