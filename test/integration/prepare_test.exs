@@ -142,7 +142,7 @@ defmodule Solutions.PrepareTest do
 
       assert Repo.all(valid) == []
 
-      # Is this what I want? People is enforced but unenforced_resource is not...
+      # I can see a case for this not being desired, but it's a fairly unusual query
       valid =
         from p in Person,
           join: ur in assoc(p, :unenforced_resource),
