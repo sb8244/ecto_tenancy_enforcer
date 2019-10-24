@@ -31,12 +31,8 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
 
       joins ->
         each_join_result =
-          Enum.reduce(joins, [], fn join = %{on: on_expr}, matched_values ->
-            if join_requires_tenancy?(join, schema_context) do
-              parse_expr(on_expr.expr, on_expr.params, matched_values, schema_context)
-            else
-              matched_values
-            end
+          Enum.reduce(joins, [], fn %{on: on_expr}, matched_values ->
+            parse_expr(on_expr.expr, on_expr.params, matched_values, schema_context)
           end)
 
         if length(each_join_result) == length(joins) and Enum.all?(each_join_result, & &1) do
