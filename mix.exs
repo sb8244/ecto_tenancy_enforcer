@@ -1,10 +1,12 @@
 defmodule Tenancy.MixProject do
   use Mix.Project
 
+  @version "0.0.1"
+
   def project do
     [
       app: :ecto_tenancy_enforcer,
-      version: "0.0.1",
+      version: @version,
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
@@ -13,6 +15,7 @@ defmodule Tenancy.MixProject do
       name: "Ecto Tenancy Enforcer",
       description: "Provides a way to ensure that all queries made from your Elixir application, using Ecto, have tenancy set",
       package: package(),
+      docs: docs()
     ]
   end
 
@@ -41,6 +44,16 @@ defmodule Tenancy.MixProject do
       links: %{"GitHub" => "https://github.com/sb8244/ecto_tenancy_enforcer"},
       files:
         ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib)
+    ]
+  end
+
+  defp docs() do
+    [
+      source_ref: "v#{@version}",
+      main: "readme",
+      extras: [
+        "README.md"
+      ]
     ]
   end
 end
