@@ -3,8 +3,8 @@ defmodule EctoTenancyEnforcer do
     defexception message: nil
   end
 
-  def enforce!(query = %Ecto.Query{}, enforced_schemas) do
-    case enforce(query, enforced_schemas) do
+  def enforce!(query = %Ecto.Query{}, opts) do
+    case enforce(query, opts) do
       ret = {:ok, _} ->
         ret
 
@@ -13,8 +13,10 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  def enforce(query = %Ecto.Query{from: %{source: {_table, mod}}}, enforced_schemas) do
-    if mod in enforced_schemas do
+  def enforce(query = %Ecto.Query{from: %{source: {_table, mod}}}, opts) do
+    enforced_schemas = Keyword.fetch!(opts, :enforced_schemas) |> extract_schemas!()
+
+    if mod in Map.keys(enforced_schemas) do
       verify_query(query, enforced_schemas)
     else
       {:ok, :unenforced_schema}
@@ -23,6 +25,17 @@ defmodule EctoTenancyEnforcer do
 
   def enforce(%Ecto.Query{from: %{source: %{query: subquery}}}, enforced_schemas) do
     enforce(subquery, enforced_schemas)
+  end
+
+  # Extract into map of %{schema_module => %{tenant_id_column}}
+  defp extract_schemas!(schemas) do
+    Enum.reduce(schemas, %{}, fn
+      {schema, tenant_id_column}, map ->
+        Map.put(map, schema, %{tenant_id_column: tenant_id_column})
+
+      schema, map ->
+        Map.put(map, schema, %{tenant_id_column: :tenant_id})
+    end)
   end
 
   defp verify_query(query, enforced_schemas) do
@@ -64,14 +77,15 @@ defmodule EctoTenancyEnforcer do
   end
 
   defp join_requires_tenancy?(%{source: {_table, mod}}, enforced_schemas, _source_mods),
-    do: mod in enforced_schemas
+    do: mod in Map.keys(enforced_schemas)
 
   defp join_requires_tenancy?(%{assoc: {ix, name}}, enforced_schemas, source_mods) do
     case Enum.at(source_mods, ix) do
       source_mod when not is_nil(source_mod) ->
         assoc_mod = source_mod.__schema__(:association, name).related
+        schema_modules = Map.keys(enforced_schemas)
 
-        Enum.all?([source_mod, assoc_mod], &Enum.member?(enforced_schemas, &1))
+        Enum.all?([source_mod, assoc_mod], &Enum.member?(schema_modules, &1))
     end
   end
 

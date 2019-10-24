@@ -8,7 +8,7 @@ defmodule Ecto.TestRepo do
   end
 
   def prepare_query(_operation, query, opts) do
-    EctoTenancyEnforcer.enforce!(query, [])
+    EctoTenancyEnforcer.enforce!(query, enforced_schemas: [])
     {query, opts}
   end
 end

@@ -1110,7 +1110,7 @@ defmodule Ecto.RepoTest do
       use Ecto.Repo, otp_app: :ecto, adapter: NoTransactionAdapter
 
       def prepare_query(_operation, query, opts) do
-        EctoTenancyEnforcer.enforce!(query, [])
+        EctoTenancyEnforcer.enforce!(query, enforced_schemas: [])
         {query, opts}
       end
     end
@@ -1162,7 +1162,7 @@ defmodule Ecto.RepoTest do
         use Ecto.Repo, otp_app: :ecto, adapter: Ecto.TestAdapter, default_dynamic_repo: :other
 
         def prepare_query(_operation, query, opts) do
-          EctoTenancyEnforcer.enforce!(query, [])
+          EctoTenancyEnforcer.enforce!(query, enforced_schemas: [])
           {query, opts}
         end
       end
@@ -1177,7 +1177,7 @@ defmodule Ecto.RepoTest do
         use Ecto.Repo, otp_app: :ecto, adapter: Ecto.TestAdapter, read_only: true
 
         def prepare_query(_operation, query, opts) do
-          EctoTenancyEnforcer.enforce!(query, [])
+          EctoTenancyEnforcer.enforce!(query, enforced_schemas: [])
           {query, opts}
         end
       end
@@ -1197,7 +1197,7 @@ defmodule Ecto.RepoTest do
 
       def prepare_query(op, query, opts) do
         send(self(), {op, query, opts})
-        EctoTenancyEnforcer.enforce!(query, [])
+        EctoTenancyEnforcer.enforce!(query, enforced_schemas: [])
         {%{query | prefix: "rewritten"}, opts}
       end
     end

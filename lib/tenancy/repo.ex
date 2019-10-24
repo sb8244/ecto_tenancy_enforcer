@@ -3,7 +3,7 @@ defmodule Tenancy.Repo do
     otp_app: :tenancy,
     adapter: Ecto.Adapters.Postgres
 
-  @enforced_schemas [Tenancy.Company, Tenancy.Person]
+  @enforced_schemas [Tenancy.Company, {Tenancy.Person, :tenant_id}]
 
   def init(_type, config) do
     config = Keyword.merge(config, Application.get_env(:tenancy, Tenancy.Repo))
@@ -12,7 +12,7 @@ defmodule Tenancy.Repo do
 
   def prepare_query(_operation, query, opts) do
     unless Keyword.get(opts, :tenancy_unchecked) do
-      EctoTenancyEnforcer.enforce!(query, @enforced_schemas)
+      EctoTenancyEnforcer.enforce!(query, enforced_schemas: @enforced_schemas)
     end
 
     {query, opts}
