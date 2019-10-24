@@ -1,10 +1,10 @@
 use Mix.Config
 
-config :tenancy,
+config :ecto_tenancy_enforcer,
   ecto_repos: [Tenancy.Repo]
 
 # Configure your database
-config :tenancy, Tenancy.Repo,
+config :ecto_tenancy_enforcer, Tenancy.Repo,
   username: "postgres",
   password: "postgres",
   database: "tenancy_test",

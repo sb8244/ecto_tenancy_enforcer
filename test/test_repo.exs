@@ -1,5 +1,5 @@
 defmodule Ecto.TestRepo do
-  use Ecto.Repo, otp_app: :tenancy, adapter: Ecto.TestAdapter
+  use Ecto.Repo, otp_app: :ecto_tenancy_enforcer, adapter: Ecto.TestAdapter
 
   def init(type, opts) do
     opts = [url: "ecto://user:pass@local/hello"] ++ opts

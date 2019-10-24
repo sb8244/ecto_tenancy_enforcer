@@ -1,12 +1,12 @@
 defmodule Tenancy.Repo do
   use Ecto.Repo,
-    otp_app: :tenancy,
+    otp_app: :ecto_tenancy_enforcer,
     adapter: Ecto.Adapters.Postgres
 
   @enforced_schemas [Tenancy.Company, {Tenancy.Person, :tenant_id}, {Tenancy.Alternate, :team_id}]
 
   def init(_type, config) do
-    config = Keyword.merge(config, Application.get_env(:tenancy, Tenancy.Repo))
+    config = Keyword.merge(config, Application.get_env(:ecto_tenancy_enforcer, Tenancy.Repo))
     {:ok, config}
   end
 

@@ -180,22 +180,22 @@ defmodule Solutions.PrepareTest do
 
     test "valid, single join association but source side has an alternate tenant id column name" do
       # Plain
-      # valid =
-      #   from a in Alternate,
-      #     join: c in Company,
-      #     on: c.tenant_id == a.team_id,
-      #     where: a.team_id == 1
+      valid =
+        from a in Alternate,
+          join: c in Company,
+          on: c.tenant_id == a.team_id,
+          where: a.team_id == 1
 
-      # assert Repo.all(valid) |> length == 1
+      assert Repo.all(valid) |> length == 1
 
-      # # Array based
-      # valid =
-      #   from a in Alternate,
-      #     join: c in Company,
-      #     on: c.tenant_id == a.team_id,
-      #     where: a.team_id in [1]
+      # Array based
+      valid =
+        from a in Alternate,
+          join: c in Company,
+          on: c.tenant_id == a.team_id,
+          where: a.team_id in [1]
 
-      # assert Repo.all(valid) |> length == 1
+      assert Repo.all(valid) |> length == 1
 
       # assoc
       valid =

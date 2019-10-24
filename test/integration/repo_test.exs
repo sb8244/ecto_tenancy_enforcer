@@ -1256,7 +1256,7 @@ defmodule Ecto.RepoTest do
 
   describe "prepare_for_query" do
     defmodule PrepareRepo do
-      use Ecto.Repo, otp_app: :tenancy, adapter: Ecto.TestAdapter
+      use Ecto.Repo, otp_app: :ecto_tenancy_enforcer, adapter: Ecto.TestAdapter
 
       def prepare_query(op, query, opts) do
         send(self(), {op, query, opts})

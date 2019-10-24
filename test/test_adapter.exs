@@ -11,7 +11,7 @@ defmodule Ecto.TestAdapter do
   end
 
   def init(opts) do
-    :tenancy = opts[:otp_app]
+    :ecto_tenancy_enforcer = opts[:otp_app]
     "user" = opts[:username]
     "pass" = opts[:password]
     "hello" = opts[:database]
