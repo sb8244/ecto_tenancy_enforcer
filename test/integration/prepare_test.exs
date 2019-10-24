@@ -236,7 +236,6 @@ defmodule Solutions.PrepareTest do
       assert Repo.all(valid) |> length == 1
     end
 
-    # TODO: This source can be extracted to make for dynamic tenant_id
     test "valid, single join association with a static tenant_id" do
       valid = from p in Person, join: c in Company, on: c.tenant_id == 1, where: p.tenant_id == 1
 
