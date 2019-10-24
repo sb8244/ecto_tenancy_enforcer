@@ -5,22 +5,20 @@ defmodule Tenancy.MixProject do
     [
       app: :tenancy,
       version: "0.1.0",
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: Mix.compilers(),
-      start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+
+      name: "Ecto Tenancy Enforcer",
+      description: "Provides a way to ensure that all queries made from your Elixir application, using Ecto, have tenancy set",
+      package: package(),
     ]
   end
 
-  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Specifies your project dependencies.
-  #
-  # Type `mix help deps` for examples and options.
   defp deps do
     [
       {:ecto, "~> 3.2"},
@@ -29,17 +27,19 @@ defmodule Tenancy.MixProject do
     ]
   end
 
-  # Aliases are shortcuts or tasks specific to the current project.
-  # For example, to create, migrate and run the seeds file at once:
-  #
-  #     $ mix ecto.setup
-  #
-  # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
-      "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate", "test"]
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Stephen Bussey"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/sb8244/ecto_tenancy_enforcer"},
+      files:
+        ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib)
     ]
   end
 end
