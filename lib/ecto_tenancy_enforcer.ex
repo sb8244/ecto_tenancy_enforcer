@@ -3,6 +3,46 @@ defmodule EctoTenancyEnforcer do
     defexception message: nil
   end
 
+  defmodule SchemaContext do
+    def extract!(schemas) do
+      %{
+        enforced_schemas: extract_schemas(schemas),
+        source_modules: :uninitialized
+      }
+    end
+
+    def put(context, :source_modules, source_modules) do
+      Map.put(context, :source_modules, source_modules)
+    end
+
+    def tenancy_enforced?(context, module) do
+      module in enforced_modules(context)
+    end
+
+    def source_by_index(%{source_modules: sources}, ix) do
+      Enum.at(sources, ix) || throw :err_index_missing_in_sources
+    end
+
+    def tenant_id_column_for_schema(%{enforced_schemas: schemas}, mod) do
+      Map.fetch!(schemas, mod) |> Map.fetch!(:tenant_id_column)
+    end
+
+    defp enforced_modules(%{enforced_schemas: schemas}) do
+      Map.keys(schemas)
+    end
+
+    # Extract into map of %{schema_module => %{tenant_id_column}}
+    defp extract_schemas(schemas) do
+      Enum.reduce(schemas, %{}, fn
+        {schema, tenant_id_column}, map ->
+          Map.put(map, schema, %{tenant_id_column: tenant_id_column})
+
+        schema, map ->
+          Map.put(map, schema, %{tenant_id_column: :tenant_id})
+      end)
+    end
+  end
+
   def enforce!(query = %Ecto.Query{}, opts) do
     case enforce(query, opts) do
       ret = {:ok, _} ->
@@ -14,10 +54,10 @@ defmodule EctoTenancyEnforcer do
   end
 
   def enforce(query = %Ecto.Query{from: %{source: {_table, mod}}}, opts) do
-    enforced_schemas = Keyword.fetch!(opts, :enforced_schemas) |> extract_schemas!()
+    schema_context = Keyword.fetch!(opts, :enforced_schemas) |> SchemaContext.extract!()
 
-    if mod in Map.keys(enforced_schemas) do
-      verify_query(query, enforced_schemas)
+    if SchemaContext.tenancy_enforced?(schema_context, mod) do
+      verify_query(query, schema_context)
     else
       {:ok, :unenforced_schema}
     end
@@ -27,21 +67,11 @@ defmodule EctoTenancyEnforcer do
     enforce(subquery, enforced_schemas)
   end
 
-  # Extract into map of %{schema_module => %{tenant_id_column}}
-  defp extract_schemas!(schemas) do
-    Enum.reduce(schemas, %{}, fn
-      {schema, tenant_id_column}, map ->
-        Map.put(map, schema, %{tenant_id_column: tenant_id_column})
-
-      schema, map ->
-        Map.put(map, schema, %{tenant_id_column: :tenant_id})
-    end)
-  end
-
-  defp verify_query(query, enforced_schemas) do
+  defp verify_query(query, schema_context) do
     with source_modules <- SourceCollector.collect_modules(query),
-         {:ok, tenant_ids_in_wheres} <- enforce_where(query, enforced_schemas, source_modules),
-         {:ok, tenant_ids_in_joins} <- enforce_joins(query, enforced_schemas, source_modules) do
+         schema_context <- SchemaContext.put(schema_context, :source_modules, source_modules),
+         {:ok, tenant_ids_in_wheres} <- enforce_where(query, schema_context),
+         {:ok, tenant_ids_in_joins} <- enforce_joins(query, schema_context) do
       case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
         [_] -> {:ok, :valid}
         _ -> {:error, "This query would run across multiple tenants: #{inspect(query)}"}
@@ -52,8 +82,8 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  defp enforce_joins(query = %{joins: joins}, enforced_schemas, source_modules) do
-    Enum.filter(joins, &join_requires_tenancy?(&1, enforced_schemas, source_modules))
+  defp enforce_joins(query = %{joins: joins}, schema_context) do
+    Enum.filter(joins, &join_requires_tenancy?(&1, schema_context))
     |> case do
       [] ->
         {:ok, []}
@@ -61,13 +91,12 @@ defmodule EctoTenancyEnforcer do
       joins ->
         each_join_result =
           Enum.reduce(joins, [], fn join = %{on: on_expr}, matched_values ->
-            if join_requires_tenancy?(join, enforced_schemas, source_modules) do
+            if join_requires_tenancy?(join, schema_context) do
               parse_expr(
                 on_expr.expr,
                 on_expr.params,
                 matched_values,
-                enforced_schemas,
-                source_modules
+                schema_context
               )
             else
               matched_values
@@ -83,37 +112,34 @@ defmodule EctoTenancyEnforcer do
   end
 
   # Incorrect source module being extracted here. It is actually the association mod, the source is
-  defp join_requires_tenancy?(%{source: {_table, mod}}, enforced_schemas, _source_mods),
-    do: mod in Map.keys(enforced_schemas)
+  defp join_requires_tenancy?(%{source: {_table, mod}}, schema_context),
+    do: SchemaContext.tenancy_enforced?(schema_context, mod)
 
-  defp join_requires_tenancy?(%{assoc: {ix, name}}, enforced_schemas, source_mods) do
-    case Enum.at(source_mods, ix) do
+  defp join_requires_tenancy?(%{assoc: {ix, name}}, schema_context) do
+    case SchemaContext.source_by_index(schema_context, ix) do
       source_mod when not is_nil(source_mod) ->
         assoc_mod = source_mod.__schema__(:association, name).related
-        schema_modules = Map.keys(enforced_schemas)
-
-        Enum.all?([source_mod, assoc_mod], &Enum.member?(schema_modules, &1))
+        Enum.all?([source_mod, assoc_mod], &SchemaContext.tenancy_enforced?(schema_context, &1))
     end
   end
 
-  defp join_requires_tenancy?(_, _, _), do: true
+  defp join_requires_tenancy?(_, _), do: true
 
-  defp enforce_where(%{wheres: wheres}, enforced_schemas, source_mods) do
-    matches = matched_values_from_where(wheres, [], enforced_schemas, source_mods)
+  defp enforce_where(%{wheres: wheres}, schema_context) do
+    matches = matched_values_from_where(wheres, [], schema_context)
     {:ok, Enum.uniq(matches)}
   end
 
   defp matched_values_from_where(
          [%{expr: expr, params: params} | exprs],
          matched_values,
-         enforced_schemas,
-         source_mods
+         schema_context
        ) do
-    matched_values = parse_expr(expr, params, matched_values, enforced_schemas, source_mods)
-    matched_values_from_where(exprs, matched_values, enforced_schemas, source_mods)
+    matched_values = parse_expr(expr, params, matched_values, schema_context)
+    matched_values_from_where(exprs, matched_values, schema_context)
   end
 
-  defp matched_values_from_where([], matched_values, _enforced_schemas, _source_mods),
+  defp matched_values_from_where([], matched_values, _schema_context),
     do: matched_values
 
   # This happens in joins
@@ -125,15 +151,17 @@ defmodule EctoTenancyEnforcer do
           ]},
          _params,
          matched_values,
-         enforced_schemas,
-         source_modules
+         schema_context
        ) do
     # A join is between two tables. We need to check that each table is joining on its appropriate
     # tenant_id_column, as they may be different
-    case {Enum.at(source_modules, left_schema_ix), Enum.at(source_modules, right_schema_ix)} do
+    case {
+      SchemaContext.source_by_index(schema_context, left_schema_ix),
+      SchemaContext.source_by_index(schema_context, right_schema_ix)
+    } do
       {l_mod, r_mod} when not is_nil(l_mod) and not is_nil(r_mod) ->
-        l_tenant_column_name = Map.fetch!(enforced_schemas, l_mod) |> Map.fetch!(:tenant_id_column)
-        r_tenant_column_name = Map.fetch!(enforced_schemas, r_mod) |> Map.fetch!(:tenant_id_column)
+        l_tenant_column_name = SchemaContext.tenant_id_column_for_schema(schema_context, l_mod)
+        r_tenant_column_name = SchemaContext.tenant_id_column_for_schema(schema_context, r_mod)
 
         if l_column == l_tenant_column_name && r_column == r_tenant_column_name do
           [:tenancy_equal | matched_values]
@@ -147,12 +175,11 @@ defmodule EctoTenancyEnforcer do
          {:==, _, [field, value]},
          params,
          matched_values,
-         enforced_schemas,
-         source_modules
+         schema_context
        ) do
-    with {query_mod, query_field} <- parse_field(field, source_modules),
+    with {query_mod, query_field} <- parse_field(field, schema_context),
          query_value <- parse_value(value, params),
-         tenant_id_column <- Map.fetch!(enforced_schemas, query_mod) |> Map.fetch!(:tenant_id_column),
+         tenant_id_column <- SchemaContext.tenant_id_column_for_schema(schema_context, query_mod),
          true <- query_field == tenant_id_column and is_integer(query_value) do
       [query_value | matched_values]
     else
@@ -165,23 +192,21 @@ defmodule EctoTenancyEnforcer do
          {:and, _, [expr1, expr2]},
          params,
          matched_values,
-         enforced_schemas,
-         source_modules
+         schema_context
        ) do
-    left = parse_expr(expr1, params, matched_values, enforced_schemas, source_modules)
-    parse_expr(expr2, params, left, enforced_schemas, source_modules)
+    left = parse_expr(expr1, params, matched_values, schema_context)
+    parse_expr(expr2, params, left, schema_context)
   end
 
   defp parse_expr(
          {:in, _, [field, value]},
          params,
          matched_values,
-         enforced_schemas,
-         source_modules
+         schema_context
        ) do
-    {query_mod, query_field} = parse_field(field, source_modules)
+    {query_mod, query_field} = parse_field(field, schema_context)
     query_value = parse_value(value, params)
-    tenant_id_column = Map.fetch!(enforced_schemas, query_mod) |> Map.fetch!(:tenant_id_column)
+    tenant_id_column = SchemaContext.tenant_id_column_for_schema(schema_context, query_mod)
 
     case {query_field, query_value} do
       {^tenant_id_column, [item]} when is_integer(item) -> [item | matched_values]
@@ -189,7 +214,7 @@ defmodule EctoTenancyEnforcer do
     end
   end
 
-  defp parse_expr(_, _, matched_values, _enforced_schemas, _source_modules) do
+  defp parse_expr(_, _, matched_values, _schema_context) do
     matched_values
   end
 
@@ -203,12 +228,12 @@ defmodule EctoTenancyEnforcer do
 
   defp parse_value(_, _), do: nil
 
-  defp parse_field({{:., _, [{:&, _, [ix]}, field_name]}, _, []}, source_modules) do
-    {Enum.at(source_modules, ix), field_name}
+  defp parse_field({{:., _, [{:&, _, [ix]}, field_name]}, _, []}, schema_context) do
+    {SchemaContext.source_by_index(schema_context, ix), field_name}
   end
 
   # This value is not used by anything, so it's descriptive
-  defp parse_field({:fragment, _, _}, _source_modules) do
+  defp parse_field({:fragment, _, _}, _schema_context) do
     :tenancy_cannot_extract_from_fragment
   end
 end
