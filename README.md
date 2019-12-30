@@ -145,10 +145,8 @@ end
 
 ## Contributing
 
-// TODO
+See `CONTRIBUTING.md`
 
 ## TODO
 
 - CI (Travis)
-- CoC
-- Contributing File
