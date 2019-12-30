@@ -1,4 +1,4 @@
-defmodule Solutions.PrepareTest do
+defmodule Integration.PrepareTest do
   use Tenancy.DataCase, async: true
 
   alias Tenancy.{Alternate, Company, UnenforcedResource, Person}
