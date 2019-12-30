@@ -186,7 +186,7 @@ end
 
 ## Contributing
 
-See `CONTRIBUTING.md`
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## TODO
 
