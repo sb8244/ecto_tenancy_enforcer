@@ -23,7 +23,7 @@ _Cons_
 - Preloading is a bit finicky - requires use of preload subqueries for even basic preloads
 - Lack of flexibility - the enforcement rules are not toggleable
 - Some edge cases may be missed (Just make an issue)
-- Does not get called for `insert_all` and `update_all`, due to how `Ecto.Repo` works
+- Does not get called for `insert_all`, due to how `Ecto.Repo` works
 
 ## Configuration
 
