@@ -23,6 +23,7 @@ _Cons_
 - Preloading is a bit finicky - requires use of preload subqueries for even basic preloads
 - Lack of flexibility - the enforcement rules are not toggleable
 - Some edge cases may be missed (Just make an issue)
+- Does not get called for `insert_all` and `update_all`, due to how `Ecto.Repo` works
 
 ## Configuration
 
@@ -79,6 +80,32 @@ test "valid query with tenant id in dynamic" do
   valid = from c in Company, where: ^dynamic_where
   assert Repo.all(valid) |> length == 1
 end
+
+test "valid, single join association has tenant_id included" do
+  valid =
+    from p in Person,
+      join: c in Company,
+      on: c.tenant_id == p.tenant_id,
+      where: p.tenant_id == 1
+
+  assert Repo.all(valid) |> length == 1
+
+  valid =
+    from p in Person,
+      join: c in Company,
+      on: c.tenant_id == p.tenant_id and c.id == p.company_id,
+      where: p.tenant_id == 1
+
+  assert Repo.all(valid) |> length == 1
+
+  valid =
+    from p in Person,
+      join: c in assoc(p, :company),
+      on: c.tenant_id == p.tenant_id,
+      where: p.tenant_id == 1
+
+  assert Repo.all(valid) |> length == 1
+end
 ```
 
 The following queries would not be allowed:
@@ -101,6 +128,20 @@ test "invalid query with tenant id in fragment" do
     Repo.all(
       from c in Company,
         where: fragment("(?)", c.tenant_id) == 1
+    )
+  end)
+end
+
+test "invalid, all join associations must be equal on tenant_id" do
+  assert_raise(TenancyViolation, fn ->
+    Repo.all(from p in Person, join: c in Company, on: c.id == p.company_id, where: p.tenant_id == 1)
+  end)
+
+  assert_raise(TenancyViolation, fn ->
+    Repo.all(
+      from p in Person,
+        join: c in assoc(p, :company),
+        where: p.tenant_id == 1
     )
   end)
 end
