@@ -147,7 +147,7 @@ test "invalid, all join associations must be equal on tenant_id" do
 end
 ```
 
-See `test/integration/prepare_test.exs` for the complete set of tests for what is allowed and not allowed.
+See [test/integration/prepare_test.exs](prepare_test.exs) for the complete set of tests for what is allowed and not allowed.
 
 ## Preloading
 
