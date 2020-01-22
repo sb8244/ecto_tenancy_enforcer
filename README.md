@@ -10,6 +10,8 @@ tenancy yourself.
 
 Both `where` and `joins` are checked for tenancy, but more may be added over time if a valid use case arises.
 
+**Important**: This does not get called for update operations, only query. I'm looking at options for testing update queries as well.
+
 ## Benefits and Tradeoffs
 
 _Pros_
