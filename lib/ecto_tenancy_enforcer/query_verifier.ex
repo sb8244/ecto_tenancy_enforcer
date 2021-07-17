@@ -153,4 +153,9 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
   defp parse_field({:fragment, _, _}, _schema_context) do
     :tenancy_cannot_extract_from_fragment
   end
+
+  # Coalesce is not parsed at all, as it can lead to unsafe queries
+  defp parse_field({:coalesce, _, _}, _schema_context) do
+    :coalesce_not_parsed
+  end
 end

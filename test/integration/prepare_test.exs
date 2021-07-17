@@ -116,6 +116,22 @@ defmodule Integration.PrepareTest do
           where: c.tenant_id == 1 and (c.id == 2 or c.id == 3)
       )
     end
+
+    test "invalid, 'coalesce' criteria is ignored" do
+      assert_raise(TenancyViolation, fn ->
+        Repo.all(
+          from c in Company,
+            where: coalesce(c.tenant_id, 1) == 1
+        )
+      end)
+    end
+
+    test "valid, 'coalesce' criteria is ignored" do
+      Repo.all(
+        from c in Company,
+          where: c.tenant_id == 1 and coalesce(c.id, 1) == 2
+      )
+    end
   end
 
   describe "Repo.all, joined tables" do
