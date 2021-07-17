@@ -1,5 +1,9 @@
 # Changelog for pre-release v0
 
+## v0.1.0
+
+Support for `coalesce/2` to be used in queries. For now, we simply ignore the coalesce statement, because there's a chance for unsafe queries with it.
+
 ## v0.0.1
 
 Initial release.
