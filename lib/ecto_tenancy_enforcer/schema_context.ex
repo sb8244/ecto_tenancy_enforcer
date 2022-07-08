@@ -8,12 +8,17 @@ defmodule EctoTenancyEnforcer.SchemaContext do
   def extract!(schemas) do
     %{
       enforced_schemas: extract_schemas(schemas),
-      source_modules: :uninitialized
+      source_modules: :uninitialized,
+      source_aliases: %{}
     }
   end
 
   def put(context, :source_modules, source_modules) do
     Map.put(context, :source_modules, source_modules)
+  end
+
+  def put(context, :source_aliases, aliases) do
+    Map.put(context, :source_aliases, aliases)
   end
 
   def tenancy_enforced?(context, module) do
@@ -22,6 +27,10 @@ defmodule EctoTenancyEnforcer.SchemaContext do
 
   def source_by_index(%{source_modules: sources}, ix) do
     Enum.at(sources, ix) || throw(:err_index_missing_in_sources)
+  end
+
+  def source_by_alias(%{source_aliases: aliases}, named_binding) do
+    Map.get(aliases, named_binding) || throw(:err_named_binding_missing_in_sources)
   end
 
   def tenant_id_column_for_schema(%{enforced_schemas: schemas}, mod) do

@@ -10,6 +10,13 @@ defmodule EctoTenancyEnforcer.SourceCollector do
     |> associate_modules()
   end
 
+  def collect_aliases(query, source_modules) do
+    Map.new(query.aliases, fn {binding, ix} ->
+      module = Enum.at(source_modules, ix) || throw(:err_index_missing_in_sources)
+      {binding, module}
+    end)
+  end
+
   defp collect_sources(%{from: nil, joins: joins}) do
     ["query" | join_sources(joins)]
   end

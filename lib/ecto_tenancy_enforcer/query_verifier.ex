@@ -10,7 +10,9 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
 
   def verify_query(query, schema_context) do
     with source_modules <- SourceCollector.collect_modules(query),
+         source_aliases <- SourceCollector.collect_aliases(query, source_modules),
          schema_context <- SchemaContext.put(schema_context, :source_modules, source_modules),
+         schema_context <- SchemaContext.put(schema_context, :source_aliases, source_aliases),
          {:ok, tenant_ids_in_wheres} <- enforce_where(query, schema_context),
          {:ok, tenant_ids_in_joins} <- enforce_joins(query, schema_context) do
       case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
@@ -143,10 +145,17 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
     end
   end
 
+  # There may be additional types here, but wouldn't make sense for a tenant ID
+  defp parse_value(value, _params) when is_number(value) or is_bitstring(value), do: value
+
   defp parse_value(_, _), do: nil
 
   defp parse_field({{:., _, [{:&, _, [ix]}, field_name]}, _, []}, schema_context) do
     {SchemaContext.source_by_index(schema_context, ix), field_name}
+  end
+
+  defp parse_field({{:., _, [{:as, _, [named_binding]}, field_name]}, _, []}, schema_context) do
+    {SchemaContext.source_by_alias(schema_context, named_binding), field_name}
   end
 
   # This value is not used by anything, so it's descriptive
