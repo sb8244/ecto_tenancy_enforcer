@@ -132,6 +132,35 @@ defmodule Integration.PrepareTest do
           where: c.tenant_id == 1 and coalesce(c.id, 1) == 2
       )
     end
+
+    test "valid query with tenant id in named binding" do
+      base = from c in Company, as: :company
+      valid = from([company: c] in base, where: c.tenant_id == 1)
+      assert Repo.all(valid) |> length == 1
+
+      base = from c in Company, where: c.tenant_id == 1
+      valid = from(c in base)
+      assert Repo.all(valid) |> length == 1
+    end
+
+    test "valid query with tenant id in alias dynamic binding" do
+      filter = dynamic(as(:company).tenant_id == 1)
+      valid = from c in Company, as: :company, where: ^filter
+      assert Repo.all(valid) |> length == 1
+
+      filter = dynamic(as(:company).tenant_id in [1])
+      valid = from c in Company, as: :company, where: ^filter
+      assert Repo.all(valid) |> length == 1
+    end
+
+    test "invalid query with tenant id in alias dynamic binding" do
+      filter = dynamic(as(:company).name == "nope")
+      valid = from c in Company, as: :company, where: ^filter
+
+      assert_raise(TenancyViolation, fn ->
+        Repo.all(valid)
+      end)
+    end
   end
 
   describe "Repo.all, joined tables" do
