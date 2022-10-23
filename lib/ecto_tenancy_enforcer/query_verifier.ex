@@ -8,6 +8,8 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
 
   alias EctoTenancyEnforcer.{SchemaContext, SourceCollector}
 
+  defguardp is_valid_tenancy_value(v) when is_integer(v) or is_bitstring(v)
+
   def verify_query(query, schema_context) do
     with source_modules <- SourceCollector.collect_modules(query),
          source_aliases <- SourceCollector.collect_aliases(query, source_modules),
@@ -109,7 +111,7 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
     with {query_mod, query_field} <- parse_field(field, schema_context),
          query_value <- parse_value(value, params),
          tenant_id_column <- SchemaContext.tenant_id_column_for_schema(schema_context, query_mod),
-         true <- query_field == tenant_id_column and is_integer(query_value) do
+         true <- query_field == tenant_id_column and is_valid_tenancy_value(query_value) do
       [query_value | matched_values]
     else
       _ ->
@@ -128,7 +130,7 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
     tenant_id_column = SchemaContext.tenant_id_column_for_schema(schema_context, query_mod)
 
     case {query_field, query_value} do
-      {^tenant_id_column, [item]} when is_integer(item) -> [item | matched_values]
+      {^tenant_id_column, [item]} when is_valid_tenancy_value(item) -> [item | matched_values]
       _ -> matched_values
     end
   end
