@@ -12,6 +12,14 @@ Both `where` and `joins` are checked for tenancy, but more may be added over tim
 
 **Important**: This does not get called for update operations, only query. I'm looking at options for testing update queries as well.
 
+## Install
+
+Include this in your `mix.exs` deps:
+
+```
+{:ecto_tenancy_enforcer, "~> 0.2"}
+```
+
 ## Benefits and Tradeoffs
 
 _Pros_
