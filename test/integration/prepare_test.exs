@@ -1,9 +1,11 @@
 defmodule Integration.PrepareTest do
   use Tenancy.DataCase, async: true
 
-  alias Tenancy.{Alternate, Company, UnenforcedResource, Person}
+  alias Tenancy.{Alternate, Company, UnenforcedResource, Person, UUIDRecord}
   alias Tenancy.Repo, as: Repo
   alias EctoTenancyEnforcer.TenancyViolation
+
+  @uuid Ecto.UUID.generate()
 
   setup do
     assert {:ok, company} = Repo.insert(%Company{tenant_id: 1, name: "mine"})
@@ -13,7 +15,9 @@ defmodule Integration.PrepareTest do
 
     assert {:ok, alternate} = Repo.insert(%Alternate{team_id: 1, name: "Steve", company_id: company.id})
 
-    {:ok, %{company: company, company2: company2, person: person, alternate: alternate}}
+    assert {:ok, uuid_id} = Repo.insert(%UUIDRecord{uuid: @uuid, name: "String ID"})
+
+    {:ok, %{company: company, company2: company2, person: person, alternate: alternate, uuid_id: uuid_id}}
   end
 
   describe "Repo.all, single table" do
@@ -160,6 +164,39 @@ defmodule Integration.PrepareTest do
       assert_raise(TenancyViolation, fn ->
         Repo.all(valid)
       end)
+    end
+
+    test "UUID fields are restricted" do
+      # Basic valid tests
+      valid = from c in UUIDRecord, where: c.uuid == ^@uuid
+      assert Repo.all(valid) |> length == 1
+
+      valid = from c in UUIDRecord, where: c.uuid == ^@uuid and c.name == "nope"
+      assert Repo.all(valid) |> length == 0
+
+      # Not included
+      invalid = from c in UUIDRecord
+      assert_raise(TenancyViolation, fn -> Repo.all(invalid) end)
+
+      # Join is valid
+      assert {:ok, _uuid_id2} = Repo.insert(%UUIDRecord{uuid: @uuid, name: "Same ID"})
+      join = (
+        from c in UUIDRecord,
+        join: other in UUIDRecord,
+        on: c.uuid == other.uuid,
+        where: c.uuid == ^@uuid,
+        distinct: c.id
+      )
+      assert Repo.all(join) |> length == 2
+
+      # Join is invalid
+      invalid_join = (
+        from c in UUIDRecord,
+        join: other in UUIDRecord,
+        where: c.uuid == ^@uuid,
+        distinct: c.id
+      )
+      assert_raise(TenancyViolation, fn -> Repo.all(invalid_join) end)
     end
   end
 
