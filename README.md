@@ -194,6 +194,11 @@ test "preload from Ecto.Query without tenant_id is an error" do
 end
 ```
 
+## Fragments
+
+Take caution if you use fragments in your code. Due to their nature, this library cannot parse their
+tenancy information. You should always manually ensure your fragments have tenancy established properly.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)

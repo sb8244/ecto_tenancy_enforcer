@@ -175,27 +175,28 @@ defmodule Integration.PrepareTest do
       assert Repo.all(valid) |> length == 0
 
       # Not included
-      invalid = from c in UUIDRecord
+      invalid = from(c in UUIDRecord)
       assert_raise(TenancyViolation, fn -> Repo.all(invalid) end)
 
       # Join is valid
       assert {:ok, _uuid_id2} = Repo.insert(%UUIDRecord{uuid: @uuid, name: "Same ID"})
-      join = (
+
+      join =
         from c in UUIDRecord,
-        join: other in UUIDRecord,
-        on: c.uuid == other.uuid,
-        where: c.uuid == ^@uuid,
-        distinct: c.id
-      )
+          join: other in UUIDRecord,
+          on: c.uuid == other.uuid,
+          where: c.uuid == ^@uuid,
+          distinct: c.id
+
       assert Repo.all(join) |> length == 2
 
       # Join is invalid
-      invalid_join = (
+      invalid_join =
         from c in UUIDRecord,
-        join: other in UUIDRecord,
-        where: c.uuid == ^@uuid,
-        distinct: c.id
-      )
+          join: other in UUIDRecord,
+          where: c.uuid == ^@uuid,
+          distinct: c.id
+
       assert_raise(TenancyViolation, fn -> Repo.all(invalid_join) end)
     end
   end
@@ -393,6 +394,33 @@ defmodule Integration.PrepareTest do
     test "invalid, the query must be rooted to tenant_id" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(from p in Person, join: c in Company, on: c.tenant_id == p.tenant_id)
+      end)
+    end
+
+    test "join against a fragment does not perform checks" do
+      valid =
+        from p in Person,
+          join: c in fragment("companies"),
+          on: c.tenant_id == p.tenant_id,
+          where: p.tenant_id == 1
+
+      assert Repo.all(valid) |> length == 1
+
+      technically_invalid =
+        from p in Person,
+          join: c in fragment("companies"),
+          on: c.id == p.company_id,
+          where: p.tenant_id == 1
+
+      assert Repo.all(technically_invalid) |> length == 1
+
+      no_join =
+        from p in Person,
+          join: c in fragment("companies"),
+          where: p.tenant_id == 1
+
+      assert_raise(TenancyViolation, fn ->
+        Repo.all(no_join)
       end)
     end
   end

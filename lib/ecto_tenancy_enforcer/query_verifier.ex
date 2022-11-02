@@ -95,6 +95,9 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
       SchemaContext.source_by_index(schema_context, left_schema_ix),
       SchemaContext.source_by_index(schema_context, right_schema_ix)
     } do
+      {l_mod, r_mod} when l_mod == "fragment" or r_mod == "fragment" ->
+        [:tenancy_equal | matched_values]
+
       {l_mod, r_mod} when not is_nil(l_mod) and not is_nil(r_mod) ->
         l_tenant_column_name = SchemaContext.tenant_id_column_for_schema(schema_context, l_mod)
         r_tenant_column_name = SchemaContext.tenant_id_column_for_schema(schema_context, r_mod)
