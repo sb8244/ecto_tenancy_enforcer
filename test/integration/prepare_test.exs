@@ -74,6 +74,11 @@ defmodule Integration.PrepareTest do
       end)
     end
 
+    test "static tenant IDs can be specified in a config" do
+      assert [_] = Repo.all(from c in Company, where: c.tenant_id in [1, 1414])
+      assert [] = Repo.all(from c in Company, where: c.tenant_id == 1414)
+    end
+
     test "invalid query with tenant id in fragment" do
       assert_raise(TenancyViolation, fn ->
         Repo.all(

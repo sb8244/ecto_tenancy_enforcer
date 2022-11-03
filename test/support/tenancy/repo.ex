@@ -17,7 +17,7 @@ defmodule Tenancy.Repo do
 
   def prepare_query(_operation, query, opts) do
     unless Keyword.get(opts, :tenancy_unchecked) do
-      EctoTenancyEnforcer.enforce!(query, enforced_schemas: @enforced_schemas)
+      EctoTenancyEnforcer.enforce!(query, enforced_schemas: @enforced_schemas, always_allowed_tenant_ids: [1414, 1415])
     end
 
     {query, opts}

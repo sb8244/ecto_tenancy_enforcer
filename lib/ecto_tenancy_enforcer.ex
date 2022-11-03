@@ -15,7 +15,7 @@ defmodule EctoTenancyEnforcer do
     schema_context = Keyword.fetch!(config, :enforced_schemas) |> SchemaContext.extract!()
 
     if SchemaContext.tenancy_enforced?(schema_context, mod) do
-      QueryVerifier.verify_query(query, schema_context)
+      QueryVerifier.verify_query(query, schema_context, config: config)
     else
       {:ok, :unenforced_schema}
     end

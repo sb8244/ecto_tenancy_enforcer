@@ -69,6 +69,9 @@ defmodule MyApp.Repo do
 end
 ```
 
+You can pass `always_allowed_tenant_ids` option to the `enforce!/2` function. This is very
+use-case specific when you have a globally-accessible tenant ID such as system provided records.
+
 ## Query Examples
 
 The following queries are all allowed (assuming `Person` and `Company` are enforced schemas):

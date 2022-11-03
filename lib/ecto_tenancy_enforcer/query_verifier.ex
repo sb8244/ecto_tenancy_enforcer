@@ -10,15 +10,24 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
 
   defguardp is_valid_tenancy_value(v) when is_integer(v) or is_bitstring(v)
 
-  def verify_query(query, schema_context) do
+  def verify_query(query, schema_context, config: config) do
+    always_allowed_tenant_ids = Keyword.get(config, :always_allowed_tenant_ids, [])
+
     with source_modules <- SourceCollector.collect_modules(query),
          source_aliases <- SourceCollector.collect_aliases(query, source_modules),
          schema_context <- SchemaContext.put(schema_context, :source_modules, source_modules),
          schema_context <- SchemaContext.put(schema_context, :source_aliases, source_aliases),
          {:ok, tenant_ids_in_wheres} <- enforce_where(query, schema_context),
          {:ok, tenant_ids_in_joins} <- enforce_joins(query, schema_context) do
-      case Enum.uniq(tenant_ids_in_wheres ++ tenant_ids_in_joins) do
-        [_] -> {:ok, :valid}
+      all_tenants = tenant_ids_in_wheres ++ tenant_ids_in_joins
+      considered_tenants = Enum.reject(all_tenants, &(&1 in always_allowed_tenant_ids))
+
+      case {Enum.uniq(considered_tenants), all_tenants} do
+        # One tenant in final result is okay
+        {[_], _} -> {:ok, :valid}
+        # If there are no considered tenants but there are tenants, it means they're allow-listed
+        {[], [_ | _]} -> {:ok, :valid}
+        # Multiple tenants
         _ -> {:error, "This query would run across multiple tenants: #{inspect(query)}"}
       end
     else
@@ -133,8 +142,12 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
     tenant_id_column = SchemaContext.tenant_id_column_for_schema(schema_context, query_mod)
 
     case {query_field, query_value} do
-      {^tenant_id_column, [item]} when is_valid_tenancy_value(item) -> [item | matched_values]
-      _ -> matched_values
+      {^tenant_id_column, values = [_ | _]} ->
+        valid = Enum.filter(values, &is_valid_tenancy_value/1)
+        valid ++ matched_values
+
+      _ ->
+        matched_values
     end
   end
 
