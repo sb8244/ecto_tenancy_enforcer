@@ -76,6 +76,7 @@ defmodule Integration.PrepareTest do
 
     test "static tenant IDs can be specified in a config" do
       assert [_] = Repo.all(from c in Company, where: c.tenant_id in [1, 1414])
+      assert [_] = Repo.all(from c in Company, where: c.tenant_id in [^1, ^1414])
       assert [] = Repo.all(from c in Company, where: c.tenant_id == 1414)
     end
 

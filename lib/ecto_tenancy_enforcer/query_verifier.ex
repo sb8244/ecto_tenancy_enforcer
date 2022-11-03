@@ -163,6 +163,10 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
     end
   end
 
+  defp parse_value(list, params) when is_list(list) do
+    Enum.map(list, &parse_value(&1, params))
+  end
+
   # There may be additional types here, but wouldn't make sense for a tenant ID
   defp parse_value(value, _params) when is_number(value) or is_bitstring(value), do: value
 
