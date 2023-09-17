@@ -1,5 +1,9 @@
 # Changelog for pre-release v0
 
+## v0.4.0
+
+Fix bug when joining tenant'd to non-tenant'd schema. Non-breaking, but bumping minor.
+
 ## v0.2.0
 
 Support for `as/1` dynamic bindings. This is a backwards compatible change.
