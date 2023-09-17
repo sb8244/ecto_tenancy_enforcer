@@ -122,7 +122,7 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
   defp parse_expr({:==, _, [field, value]}, params, matched_values, schema_context) do
     with {query_mod, query_field} <- parse_field(field, schema_context),
          query_value <- parse_value(value, params),
-         tenant_id_column <- SchemaContext.tenant_id_column_for_schema(schema_context, query_mod),
+         tenant_id_column when not is_nil(tenant_id_column) <- SchemaContext.maybe_tenant_id_column_for_schema(schema_context, query_mod),
          true <- query_field == tenant_id_column and is_valid_tenancy_value(query_value) do
       [query_value | matched_values]
     else
@@ -139,7 +139,7 @@ defmodule EctoTenancyEnforcer.QueryVerifier do
   defp parse_expr({:in, _, [field, value]}, params, matched_values, schema_context) do
     {query_mod, query_field} = parse_field(field, schema_context)
     query_value = parse_value(value, params)
-    tenant_id_column = SchemaContext.tenant_id_column_for_schema(schema_context, query_mod)
+    tenant_id_column = SchemaContext.maybe_tenant_id_column_for_schema(schema_context, query_mod)
 
     case {query_field, query_value} do
       {^tenant_id_column, values = [_ | _]} ->

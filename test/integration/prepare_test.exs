@@ -429,6 +429,32 @@ defmodule Integration.PrepareTest do
         Repo.all(no_join)
       end)
     end
+
+    test "valid, join from tenant to non-tenant schema" do
+      from(
+        p in Tenancy.Person,
+        join: u in assoc(p, :unenforced_resource),
+        where: u.id in [1, 2, 3],
+        where: p.tenant_id == 1
+      )
+      |> Repo.all()
+
+      from(
+        p in Tenancy.Person,
+        join: u in assoc(p, :unenforced_resource),
+        where: u.id == 1,
+        where: p.tenant_id == 1
+      )
+      |> Repo.all()
+
+      from(
+        p in Tenancy.Person,
+        join: u in Tenancy.UnenforcedResource,
+        on: p.tenant_id == u.id,
+        where: p.tenant_id == 1
+      )
+      |> Repo.all()
+    end
   end
 
   describe "Repo.get_by" do

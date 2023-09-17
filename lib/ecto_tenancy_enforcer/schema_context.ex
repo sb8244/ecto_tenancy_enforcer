@@ -37,6 +37,13 @@ defmodule EctoTenancyEnforcer.SchemaContext do
     Map.fetch!(schemas, mod) |> Map.fetch!(:tenant_id_column)
   end
 
+  def maybe_tenant_id_column_for_schema(%{enforced_schemas: schemas}, mod) do
+    case Map.get(schemas, mod) do
+      nil -> nil
+      mod -> Map.fetch!(mod, :tenant_id_column)
+    end
+  end
+
   # private
 
   defp enforced_modules(%{enforced_schemas: schemas}) do
